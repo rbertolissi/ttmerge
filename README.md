@@ -2,7 +2,7 @@
 
 A library for efficiently selecting and merging expert LoRAs at Test-Time
 
-**[Documentation](https://example.com)**
+**[Documentation](https://rbertolissi.github.io/ttmerge/)**
 
 Please cite our work if you use this library in your research ([bibtex below](#citation)):
 
