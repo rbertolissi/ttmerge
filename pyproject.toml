@@ -1,0 +1,37 @@
+[tool.poetry]
+name = "ttmerge"
+version = "0.0.1"
+description = "Efficiently select and merge expert LoRAs at Test-Time"
+authors = ["Ryo Bertolissi <rbertolissi@ethz.ch>"]
+license = "MIT"
+readme = "README.md"
+packages = [{include = "ttmerge", from = "src"}]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+]
+
+[tool.poetry.dependencies]
+python = ">=3.10"
+torch = "^2.5.0"
+safetensors = "^0.4.5"
+tqdm = "^4.0.0"
+
+
+[poetry.group.dev.dependencies]
+pytest = "^7.0.0"
+black = ">=0.0"
+pyright = "^1.1.350"
+
+[tool.poetry.urls]
+homepage = "https://github.com/Riooo0623/ttmerge"
+repository = "https://github.com/Riooo0623/ttmerge"
+
+[build-system]
+requires = ["poetry>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
