@@ -88,6 +88,6 @@ from .merging_model import TestTimeMergingModel
 
 __all__ = ["TestTimeMergingModel"]
 
-__version__ = "0.0.1"
+__version__ = "0.0.2"
 __author__ = "Ryo Bertolissi"
 __credits__ = "ETH Zurich, Switzerland"

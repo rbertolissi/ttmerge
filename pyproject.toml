@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "ttmerge"
-version = "0.0.1"
+version = "0.0.2"
 description = "Efficiently select and merge expert LoRAs at Test-Time"
 authors = ["Ryo Bertolissi <rbertolissi@ethz.ch>"]
 license = "MIT"
@@ -30,8 +30,8 @@ pyright = "^1.1.350"
 pdoc = "^14.1.0"
 
 [tool.poetry.urls]
-homepage = "https://github.com/rbertolissi/ttmerge"
 repository = "https://github.com/rbertolissi/ttmerge"
+documentation = "https://rbertolissi.github.io/ttmerge"
 
 [build-system]
 requires = ["poetry>=1.0.0"]
