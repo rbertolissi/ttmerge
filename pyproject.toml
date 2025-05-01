@@ -27,10 +27,11 @@ tqdm = "^4.0.0"
 pytest = "^7.0.0"
 black = ">=0.0"
 pyright = "^1.1.350"
+pdoc = "^14.1.0"
 
 [tool.poetry.urls]
-homepage = "https://github.com/Riooo0623/ttmerge"
-repository = "https://github.com/Riooo0623/ttmerge"
+homepage = "https://github.com/rbertolissi/ttmerge"
+repository = "https://github.com/rbertolissi/ttmerge"
 
 [build-system]
 requires = ["poetry>=1.0.0"]

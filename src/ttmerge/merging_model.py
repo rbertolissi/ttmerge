@@ -2,65 +2,80 @@ import torch
 import safetensors.torch
 import json
 from tqdm import tqdm
+from typing import Any, Union, Optional
 
 
 class TestTimeMergingModel(torch.nn.Module):
+    r"""
+    Initializes the Test-Time Merging Model, which merges expert language models
+    based on topic similarity using sparse cross-attention. This is a implementation
+    of the algorithm for Test-Time Model Merging (TTMM) as described in the paper.
+
+    This computes similarity between the input context and cluster embeddings,
+    then merges the most relevant expert adapters into the base model for inference.
+
+    **Note:** Input must have a batch size of 1.
+    """
+
     def __init__(
         self,
         corpus: torch.Tensor,
-        tokenizer,
-        encoder,
-        base_model,
-        device=torch.device("cpu"),
-        max_merge_count=50,
-        verbose=False,
-        beta=0.2,
-        tau=0.01,
-        prefix_length=50,
-        adapter_location="/path/to/adapters",
-        keep_in_memory=False,
-        keep_on_device=False,
+        tokenizer: Any,
+        encoder: Any,
+        base_model: Any,
+        adapter_location: str,
+        beta: float = 0.2,
+        tau: float = 0.01,
+        device: Optional[Union[str, torch.device]] = None,
+        max_merge_count: int = 50,
+        verbose: bool = False,
+        prefix_length: int = 50,
+        keep_in_memory: bool = False,
+        keep_on_device: bool = False,
     ):
         """
-        Initializes the TTMM (Test-Time Model Merging) class.
-
-        This class merges specialized expert language models based on topic similarity.
-
-        Only a batch size of 1 is allowed for the input tensor.
-
-        Parameters:
-            beta (float): Square root of the beta value to use in sparse cross attention (default: 0.2).
-            tau (float): Sparsity parameter in the sparse cross attention (default: 0.01).
-            tokenizer: Tokenizer for the language model.
-            encoder: Encoder to generate text embeddings
-            corpus (torch.Tensor): Embeddings of model clusters with shape (n_clusters, embedding_dim), where each row represents a cluster embedding.
-            adapter_location (str): Path to the directory containing expert model adapters. Clusters are numbered from 0 to n_clusters-1.
-                The directory should contain subdirectories for each cluster, each containing the adapter files.
-                Expected structure:
-                    ├── adapter_location/
-                    │   ├── 0/
-                    │   │   ├── adapter_config.json
-                    │   │   ├── adapter_model.safetensors
-                    │   ├── 1/
-                    │   │   ├── adapter_config.json
-                    │   │   ├── adapter_model.safetensors
-                    │   ├── ...
-            prefix_length (int, optional): Prefix length used for generating query embeddings (default: 50).
-            max_merge_count (int, optional): Maximum number of models to merge (default: 50).
-            device (torch.device, optional): Device to run the model on (default: "cpu").
-            keep_in_memory (bool, optional): Whether to cache in memory the adapter tensors (default: False).
-            keep_on_device (bool, optional): Whether to keep the cached adapter tensor on device (default: False), only works if keep_in_memory is also set to True.
-            verbose (bool, optional): Whether to enable verbose logging (default: False).
+        :param corpus: Embeddings of model clusters with shape (n_clusters, embedding_dim),
+            where each row represents a cluster embedding.
+        :param tokenizer: Tokenizer for the language model. Must support decode() method.
+        :param encoder: Encoder to generate text embeddings. Must support encode() method
+            that returns tensors.
+        :param base_model: The underlying language model.
+        :param adapter_location: Path to the directory containing expert model adapters.
+            Clusters are numbered from 0 to n_clusters-1. Expected structure:
+            ```
+            adapter_location/
+            ├── 0/
+            │   ├── adapter_config.json
+            │   ├── adapter_model.safetensors
+            ├── 1/
+            │   ├── adapter_config.json
+            │   ├── adapter_model.safetensors
+            ├── ...
+            ```
+        :param beta: Square root of the beta value to use in sparse cross attention.
+        :param tau: Sparsity parameter in the sparse cross attention.
+        :param device: Device to run the model on. If None, will use CUDA if available.
+        :param max_merge_count: Maximum number of models to merge.
+        :param verbose: Whether to enable verbose logging.
+        :param prefix_length: Prefix length used for generating query embeddings.
+        :param keep_in_memory: Whether to cache in memory the adapter tensors.
+        :param keep_on_device: Whether to keep the cached adapter tensor on device,
+            only works if keep_in_memory is also set to True.
         """
         super().__init__()
+        if device is None:
+            device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        elif isinstance(device, str):
+            device = torch.device(device)
+
         self.device = device
         self.corpus = corpus.to(self.device)
         self.max_merge_count = max_merge_count
         self.tokenizer = tokenizer
         self.encoder = encoder
         self.baseModel = base_model
-        self.config = self.baseModel.config
-        self.tie_weights = self.baseModel.tie_weights
+        self.config = getattr(self.baseModel, "config", None)
+        self.tie_weights = getattr(self.baseModel, "tie_weights", False)
         self.verbose = verbose
         self.beta = beta
         self.tau = tau
@@ -91,12 +106,9 @@ class TestTimeMergingModel(torch.nn.Module):
         Efficiently merge LoRA adapters by directly computing weight deltas
         and applying them to the base model parameters.
 
-        Args:
-            selected_clusters: List of cluster indices to merge
-            weights: List of weights corresponding to each cluster
-
-        Returns:
-            List of parameter names that were modified
+        :param selected_clusters: List of cluster indices to merge
+        :param weights: List of weights corresponding to each cluster
+        :returns: List of parameter names that were modified
         """
         modified_params = []
 
@@ -197,7 +209,11 @@ class TestTimeMergingModel(torch.nn.Module):
         return modified_params
 
     def _restore_original_weights(self, modified_params):
-        """Restore original weights for modified parameters"""
+        """
+        Restore original weights for modified parameters
+
+        :param modified_params: List of parameter names that were modified
+        """
         for name in modified_params:
             param = self.baseModel.get_parameter(name)
             param.data.copy_(self.original_weights[name])
@@ -207,11 +223,10 @@ class TestTimeMergingModel(torch.nn.Module):
         Load and merge the appropriate expert adapter(s) based on the input context.
         This method computes the similarity between the input and the cluster embeddings,
         selects the most relevant clusters, and merges their adapters.
-        the input has to have a batch size of 1: x has to be a tensor of shape (1, seq_len).
-        Args:
-            x: Input tensor containing token IDs to be processed by the model
-        Returns:
-            List of parameter names that were modified
+        The input has to have a batch size of 1: x has to be a tensor of shape (1, seq_len).
+
+        :param x: Input tensor containing token IDs to be processed by the model
+        :return: List of parameter names that were modified
         """
 
         if x.dim() == 1:
@@ -285,14 +300,16 @@ class TestTimeMergingModel(torch.nn.Module):
 
     def forward(self, x: torch.Tensor, **kwargs):
         """
-        Forward pass for the TTMM model. Processes input by loading and merging the necessary expert adapter(s).
-        It evaluates the model without gradient calculation and returns the resulting logits.
-        The merged adapter is deleted after use to free up memory.
-        Args:
-            x: Input tensor containing token IDs to be processed by the model
-            **kwargs: Additional arguments for the model's forward method
-        Returns:
-            TTMMOutput: An object containing the output logits from the model evaluation
+        Runs a forward pass through the TTMM model using merged expert adapters.
+
+        This method computes the model's output logits for a given input.
+        It first loads and merges the most relevant expert adapters based on the
+        input context, then evaluates the model. After inference, it restores
+        the original model weights.
+
+        :param x: Input tensor containing token IDs to be processed by the model
+        :param kwargs: Additional arguments for the model's forward method
+        :return: Output object containing the logits from the model evaluation
         """
 
         merged_adapter_names = self._load_merged_model(x)
@@ -307,17 +324,16 @@ class TestTimeMergingModel(torch.nn.Module):
 
     def generate(self, x: torch.Tensor, **kwargs):
         """
-        Generates text using the loaded adapter configuration.
+        Generates text using the merged expert adapter configuration.
 
-        This method loads an appropriate merged adapter based on the input context,
-        then uses the configured model to generate text up to the specified max_length.
-        After generation, it cleans up any temporarily created adapters to free memory.
+        This method computes the model's output logits for a given input.
+        It first loads and merges the most relevant expert adapters based on the
+        input context, then generates using the model. After generation, it restores
+        the original model weights.
 
-        Args:
-            x: Input tensor containing token IDs that serve as the generation prompt
-            **kwargs: Additional arguments for the model's generate method
-        Returns:
-            torch.Tensor: Generated token IDs
+        :param x: Input tensor containing token IDs that serve as the generation prompt
+        :param kwargs: Additional arguments for the model's generate method
+        :return: Generated token IDs as a tensor
         """
         merged_adapter_names = self._load_merged_model(x)
 
@@ -326,7 +342,5 @@ class TestTimeMergingModel(torch.nn.Module):
             outputs = self.baseModel.generate(input_ids=x, **kwargs)
 
         self._restore_original_weights(merged_adapter_names)
-
-        torch.cuda.empty_cache()
 
         return outputs

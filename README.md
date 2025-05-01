@@ -32,7 +32,8 @@ encoder = SentenceTransformer("all-mpnet-base-v2")
 corpus_normalised_embeddings = torch.load("path/to/corpus_embeddings.pt")  # Shape: [n_experts, embedding_dim]
 
 # Directory containing numbered subdirectories (0/, 1/, etc.) where expert LoRAs are stored.
-# The individual expert LoRAs should be in the format that the PEFT library uses, with each directory containing adapter_config.json and adapter_model.safetensors files.
+# The individual expert LoRAs should be in the format that the PEFT library uses, 
+# with each directory containing adapter_config.json and adapter_model.safetensors files.
 adapter_location = "path/to/adapters" 
 
 # 3. Initialize the TestTimeMergingModel
@@ -43,7 +44,7 @@ merging_model = TestTimeMergingModel(
     encoder=encoder,
     base_model=base_model,
     device=device,
-    adapter_location="path/to/adapters"
+    adapter_location=adapter_location,
     verbose=True
 )
 
@@ -69,10 +70,9 @@ print(generated_text)
 
 * The code is auto-formatted using `black .`.
 * Static type checks can be run using `pyright`.
-* Tests can be run using `pytest test`.
 
 ## Citation
 
 ```bibtex
-
+% Citation coming soon.
 ```
