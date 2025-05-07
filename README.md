@@ -26,10 +26,10 @@ tokenizer = AutoTokenizer.from_pretrained("meta-llama/Llama-3.2-1B")
 base_model = AutoModelForCausalLM.from_pretrained("meta-llama/Llama-3.2-1B")
 encoder = SentenceTransformer("all-mpnet-base-v2")
 
-# 2. Load normalized corpus embeddings that represent expert domains
+# 2. Load normalized expert embeddings that represent expert domains
 # Each row corresponds to an expert: row 0 is the normalized embedding vector of expert 0, row 1 is for expert 1, etc.
 # Typically, you would load these pre-computed embeddings from a file
-corpus_normalised_embeddings = torch.load("path/to/corpus_embeddings.pt")  # Shape: [n_experts, embedding_dim]
+expert_embeddings = torch.load("path/to/expert_embeddings.pt")  # Shape: [n_experts, embedding_dim]
 
 # Directory containing numbered subdirectories (0/, 1/, etc.) where expert LoRAs are stored.
 # The individual expert LoRAs should be in the format that the PEFT library uses, 
@@ -39,7 +39,7 @@ adapter_location = "path/to/adapters"
 # 3. Initialize the TestTimeMergingModel
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 merging_model = TestTimeMergingModel(
-    corpus=corpus_normalised_embeddings,
+    expert_embeddings=expert_embeddings,
     tokenizer=tokenizer,
     encoder=encoder,
     base_model=base_model,

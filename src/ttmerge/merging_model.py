@@ -19,7 +19,7 @@ class TestTimeMergingModel(torch.nn.Module):
 
     def __init__(
         self,
-        corpus: torch.Tensor,
+        expert_embeddings: torch.Tensor,
         tokenizer: Any,
         encoder: Any,
         base_model: Any,
@@ -34,14 +34,14 @@ class TestTimeMergingModel(torch.nn.Module):
         keep_on_device: bool = False,
     ):
         """
-        :param corpus: Embeddings of model clusters with shape (n_clusters, embedding_dim),
-            where each row represents a cluster embedding.
+        :param expert_embeddings: Embeddings of expert models with shape (n_experts, embedding_dim),
+            where each row represents the embeddings of the knowledge of an expert.
         :param tokenizer: Tokenizer for the language model. Must support decode() method.
         :param encoder: Encoder to generate text embeddings. Must support encode() method
             that returns tensors.
         :param base_model: The underlying language model.
         :param adapter_location: Path to the directory containing expert model adapters.
-            Clusters are numbered from 0 to n_clusters-1. Expected structure:
+            Experts are numbered from 0 to n_experts-1. Expected structure:
             ```
             adapter_location/
             ├── 0/
@@ -69,7 +69,7 @@ class TestTimeMergingModel(torch.nn.Module):
             device = torch.device(device)
 
         self.device = device
-        self.corpus = corpus.to(self.device)
+        self.expert_embeddings = expert_embeddings.to(self.device)
         self.max_merge_count = max_merge_count
         self.tokenizer = tokenizer
         self.encoder = encoder
@@ -248,7 +248,7 @@ class TestTimeMergingModel(torch.nn.Module):
         query_embedding = torch.nn.functional.normalize(query_embedding, p=2, dim=1)
 
         # Compute the sparse cross attention kernel
-        similarities = torch.mm(query_embedding, self.corpus.T).squeeze(0)
+        similarities = torch.mm(query_embedding, self.expert_embeddings.T).squeeze(0)
         distances = 1 - similarities
         kernel_values = torch.exp(-(distances / (self.beta**2)))
 
@@ -261,9 +261,9 @@ class TestTimeMergingModel(torch.nn.Module):
             if torch.isnan(normalized_weights).any():
                 if self.verbose:
                     print(
-                        "NANs in normalized weights, falling back to the closest corpus vector"
+                        "NANs in normalized weights, falling back to the closest expert_embeddings vector"
                     )
-                # Get the closest corpus vector to the query embedding
+                # Get the closest expert_embeddings vector to the query embedding
                 selected_clusters = [torch.argmax(similarities).item()]
                 weights = [1.0]
             else:
