@@ -21,23 +21,28 @@ from transformers import AutoTokenizer, AutoModelForCausalLM
 from sentence_transformers import SentenceTransformer
 from ttmerge import TestTimeMergingModel
 
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
 # 1. Load base components
 tokenizer = AutoTokenizer.from_pretrained("meta-llama/Llama-3.2-1B")
-base_model = AutoModelForCausalLM.from_pretrained("meta-llama/Llama-3.2-1B")
+base_model = AutoModelForCausalLM.from_pretrained("meta-llama/Llama-3.2-1B").to(device)
 encoder = SentenceTransformer("all-mpnet-base-v2")
 
-# 2. Load normalized expert embeddings that represent expert domains
-# Each row corresponds to an expert: row 0 is the normalized embedding vector of expert 0, row 1 is for expert 1, etc.
-# Typically, you would load these pre-computed embeddings from a file
-expert_embeddings = torch.load("path/to/expert_embeddings.pt")  # Shape: [n_experts, embedding_dim]
+# 2. Download expert embeddings and adapter weights
+snapshot_download(
+    repo_id="rbertolissi/Llama-3.2-1B-TTMM-Wikipedia",
+    local_dir="./experts",
+)
+
+# 3. Load normalized expert embeddings that represent expert domains
+expert_embeddings = torch.load("./experts/mpnet-wikipedia-expert-embeddings.pt", weights_only=True)  # Shape: [n_experts, embedding_dim]
 
 # Directory containing numbered subdirectories (0/, 1/, etc.) where expert LoRAs are stored.
 # The individual expert LoRAs should be in the format that the PEFT library uses, 
 # with each directory containing adapter_config.json and adapter_model.safetensors files.
-adapter_location = "path/to/adapters" 
+adapter_location = "./experts"
 
-# 3. Initialize the TestTimeMergingModel
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+# 4. Initialize the TestTimeMergingModel
 merging_model = TestTimeMergingModel(
     expert_embeddings=expert_embeddings,
     tokenizer=tokenizer,
@@ -45,23 +50,24 @@ merging_model = TestTimeMergingModel(
     base_model=base_model,
     device=device,
     adapter_location=adapter_location,
-    verbose=True
+    verbose=True,
+    encoder_prompt=None # No prompt needed for MpNet
 )
 
-# 4. Generate text using relevant expert models.
-prompt = "Quantum computing is"
-input_ids = tokenizer(prompt, return_tensors="pt").input_ids.to(device)
+# 5. Generate text using relevant expert models.
+text =  "Replace me by any text you'd like."
+encoded_input = tokenizer(text, return_tensors="pt").to(device)
 
-# The model automatically selects and merges the most relevant expert adapters
-generated_ids = merging_model.generate(
-    input_ids,
-    max_length=512,
+# Generate text using merged expert models
+output = model.generate(
+    **encoded_input,
+    max_length=128,
     temperature=0.7,
     do_sample=True
 )
 
-generated_text = tokenizer.decode(generated_ids[0], skip_special_tokens=True)
-print(generated_text)
+output_text = tokenizer.decode(output[0], skip_special_tokens=True)
+print(output_text)
 ```
 
 ## Development

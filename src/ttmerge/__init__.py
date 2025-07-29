@@ -29,23 +29,31 @@ With these, we can initialize and use the `TestTimeMergingModel`:
 
 ```python
 import torch
+from huggingface_hub import snapshot_download
 from transformers import AutoTokenizer, AutoModelForCausalLM
 from sentence_transformers import SentenceTransformer
 from ttmerge import TestTimeMergingModel
 
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+# Download expert embeddings and adapter weights
+snapshot_download(
+    repo_id="rbertolissi/Llama-3.2-1B-TTMM-Wikipedia",
+    local_dir="./experts"
+)
+
 # Load base components
 tokenizer = AutoTokenizer.from_pretrained("meta-llama/Llama-3.2-1B")
-base_model = AutoModelForCausalLM.from_pretrained("meta-llama/Llama-3.2-1B")
+base_model = AutoModelForCausalLM.from_pretrained("meta-llama/Llama-3.2-1B").to(device)
 encoder = SentenceTransformer("all-mpnet-base-v2")
 
 # Load expert embeddings representing expert topics/domains
-expert_embeddings = torch.load("path/to/expert_embeddings.pt")  # Shape: [n_experts, embedding_dim]
+expert_embeddings = torch.load("./experts/mpnet-wikipedia-expert-embeddings.pt", weights_only=True)  # Shape: [n_experts, embedding_dim]
 
 # Path to expert adapters (PEFT format)
-adapter_location = "path/to/adapters"
+adapter_location = "./experts"
 
 # Initialize test-time merging model
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 model = TestTimeMergingModel(
     expert_embeddings=expert_embeddings,
     tokenizer=tokenizer,
@@ -53,24 +61,25 @@ model = TestTimeMergingModel(
     base_model=base_model,
     device=device,
     adapter_location=adapter_location,
-    verbose=True
+    verbose=True,
+    encoder_prompt=None # No prompt needed for MpNet
 )
 ```
 
 Once initialized, the model automatically selects and merges the most relevant expert adapters based on the input:
 ```python
-prompt = "Quantum computing is"
-input_ids = tokenizer(prompt, return_tensors="pt").input_ids.to(device)
+text = "Replace me by any text you'd like."
+encoded_input = tokenizer(text, return_tensors="pt").to(device)
 
 # Generate text using merged expert models
-output_ids = model.generate(
-    input_ids,
-    max_length=512,
+output = model.generate(
+    **encoded_input,
+    max_length=128,
     temperature=0.7,
     do_sample=True
 )
 
-output_text = tokenizer.decode(output_ids[0], skip_special_tokens=True)
+output_text = tokenizer.decode(output[0], skip_special_tokens=True)
 print(output_text)
 ```
 
@@ -88,6 +97,6 @@ from .merging_model import TestTimeMergingModel
 
 __all__ = ["TestTimeMergingModel"]
 
-__version__ = "0.0.3"
+__version__ = "0.0.4"
 __author__ = "Ryo Bertolissi"
 __credits__ = "ETH Zurich, Switzerland"

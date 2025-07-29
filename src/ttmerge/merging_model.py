@@ -32,6 +32,7 @@ class TestTimeMergingModel(torch.nn.Module):
         prefix_length: int = 50,
         keep_in_memory: bool = False,
         keep_on_device: bool = False,
+        encoder_prompt: Optional[str] = None,
     ):
         """
         :param expert_embeddings: Embeddings of expert models with shape (n_experts, embedding_dim),
@@ -61,6 +62,7 @@ class TestTimeMergingModel(torch.nn.Module):
         :param keep_in_memory: Whether to cache in memory the adapter tensors.
         :param keep_on_device: Whether to keep the cached adapter tensor on device,
             only works if keep_in_memory is also set to True.
+        :param encoder_prompt: Optional prompt to use with the encoder for generating embeddings.
         """
         super().__init__()
         if device is None:
@@ -83,6 +85,7 @@ class TestTimeMergingModel(torch.nn.Module):
         self.adapterLocation = adapter_location
         self.keep_in_memory = keep_in_memory
         self.keep_on_device = keep_on_device
+        self.encoder_prompt = encoder_prompt
 
         # Store the mapping between PEFT adapter names and base model parameter names
         self.peft_to_base_mapping = {}
@@ -240,11 +243,26 @@ class TestTimeMergingModel(torch.nn.Module):
         query = self.tokenizer.decode(
             x[0][: self.prefix_length], skip_special_tokens=True
         )
-        query_embedding = (
-            self.encoder.encode(query, convert_to_tensor=True, show_progress_bar=False)
-            .unsqueeze(0)
-            .to(self.device)
-        )
+
+        if self.encoder_prompt:
+            query_embedding = (
+                self.encoder.encode(
+                    query,
+                    convert_to_tensor=True,
+                    show_progress_bar=False,
+                    prompt=self.encoder_prompt,
+                )
+                .unsqueeze(0)
+                .to(self.device)
+            )
+        else:
+            query_embedding = (
+                self.encoder.encode(
+                    query, convert_to_tensor=True, show_progress_bar=False
+                )
+                .unsqueeze(0)
+                .to(self.device)
+            )
         query_embedding = torch.nn.functional.normalize(query_embedding, p=2, dim=1)
 
         # Compute the sparse cross attention kernel
@@ -269,7 +287,7 @@ class TestTimeMergingModel(torch.nn.Module):
             else:
                 # Handle case where no models are above tau, thus falling back to base model
                 if self.verbose:
-                    print("NO MODEL ABOVE TAU, falling back to base model")
+                    print("No model above tau, falling back to base model")
                 return []
         else:
             if selected_mask.sum() > self.max_merge_count:
@@ -298,7 +316,7 @@ class TestTimeMergingModel(torch.nn.Module):
 
         return adapter_names
 
-    def forward(self, x: torch.Tensor, **kwargs):
+    def forward(self, input_ids: torch.Tensor, **kwargs):
         """
         Runs a forward pass through the TTMM model using merged expert adapters.
 
@@ -312,17 +330,17 @@ class TestTimeMergingModel(torch.nn.Module):
         :return: Output object containing the logits from the model evaluation
         """
 
-        merged_adapter_names = self._load_merged_model(x)
+        merged_adapter_names = self._load_merged_model(input_ids)
 
         with torch.no_grad():
             self.baseModel.eval()
-            outputs = self.baseModel(input_ids=x, **kwargs)
+            outputs = self.baseModel(input_ids=input_ids, **kwargs)
 
         self._restore_original_weights(merged_adapter_names)
 
         return outputs
 
-    def generate(self, x: torch.Tensor, **kwargs):
+    def generate(self, input_ids: torch.Tensor, **kwargs):
         """
         Generates text using the merged expert adapter configuration.
 
@@ -335,11 +353,11 @@ class TestTimeMergingModel(torch.nn.Module):
         :param kwargs: Additional arguments for the model's generate method
         :return: Generated token IDs as a tensor
         """
-        merged_adapter_names = self._load_merged_model(x)
+        merged_adapter_names = self._load_merged_model(input_ids)
 
         with torch.no_grad():
             self.baseModel.eval()
-            outputs = self.baseModel.generate(input_ids=x, **kwargs)
+            outputs = self.baseModel.generate(input_ids=input_ids, **kwargs)
 
         self._restore_original_weights(merged_adapter_names)
 

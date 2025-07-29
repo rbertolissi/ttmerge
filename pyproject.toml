@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "ttmerge"
-version = "0.0.3"
+version = "0.0.4"
 description = "Efficiently select and merge expert LoRAs at Test-Time"
 authors = ["Ryo Bertolissi <rbertolissi@ethz.ch>"]
 license = "MIT"
