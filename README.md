@@ -4,8 +4,9 @@ A library for efficiently selecting and merging expert LoRAs at Test-Time
 
 **[Documentation](https://rbertolissi.github.io/ttmerge/)**
 
-Please cite our work if you use this library in your research ([bibtex below](#citation)):
+Please cite our work if you use this library in your research ([bibtex below](#citation))
 
+Models that can be used with this library are available on [Huggingface](https://huggingface.co/collections/rbertolissi/test-time-model-merging-ttmm-6886dec2c436cc4ceaf39ff7)
 
 ## Installation
 
@@ -28,7 +29,7 @@ tokenizer = AutoTokenizer.from_pretrained("meta-llama/Llama-3.2-1B")
 base_model = AutoModelForCausalLM.from_pretrained("meta-llama/Llama-3.2-1B").to(device)
 encoder = SentenceTransformer("all-mpnet-base-v2")
 
-# 2. Download expert embeddings and adapter weights
+# 2. Download expert embeddings and adapter weights (other models available on Huggingface)
 snapshot_download(
     repo_id="rbertolissi/Llama-3.2-1B-TTMM-Wikipedia",
     local_dir="./experts",
