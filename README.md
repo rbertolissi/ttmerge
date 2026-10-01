@@ -1,12 +1,12 @@
 # Test-Time Model Merging (TTMM)
 
-A library for efficiently selecting and merging expert LoRAs at Test-Time
+Official implementation of **Test-Time Model Merging (TTMM)**, an efficient approach to test-time adaptation that selects and merges relevant expert LoRA adapters for each input.
 
-**[Documentation](https://rbertolissi.github.io/ttmerge/)**
+**[Paper](<PAPER_LINK>)** · **[Documentation](https://rbertolissi.github.io/ttmerge/)** · **[Models](https://huggingface.co/collections/rbertolissi/test-time-model-merging-ttmm-6886dec2c436cc4ceaf39ff7)**
 
-Please cite our work if you use this library in your research ([bibtex below](#citation))
+TTMM approximates test-time training through model merging, enabling input-dependent adaptation without gradient updates at inference time.
 
-Models that can be used with this library are available on [Huggingface](https://huggingface.co/collections/rbertolissi/test-time-model-merging-ttmm-6886dec2c436cc4ceaf39ff7)
+If you use this library in your research, please cite our work using the [BibTeX entry below](#citation).
 
 ## Installation
 
@@ -81,5 +81,10 @@ print(output_text)
 ## Citation
 
 ```bibtex
-% Citation coming soon.
+@inproceedings{bertolissi2025local,
+  title = {Local Mixtures of Experts: Essentially Free Test-Time Training via Model Merging},
+  author = {Bertolissi, Ryo and Hübotter, Jonas and Hakimi, Ido and Krause, Andreas},
+  year = {2025},
+  booktitle = {Conference on Language Modeling (2025)},
+}
 ```
